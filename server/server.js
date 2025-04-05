@@ -25,13 +25,21 @@ app.use('/uploads', express.static('uploads'));
 
 const db = require("./models");
 
+// Función para probar la conexión a la base de datos
+const testDatabaseConnection = async () => {
+  try {
+    await db.sequelize.authenticate();
+    console.log("Conexión a la base de datos establecida correctamente.");
+  } catch (error) {
+    console.error("No se pudo conectar a la base de datos:", error);
+    process.exit(1);
+  }
+};
+
 // Función para inicializar la base de datos
 const initializeDatabase = async () => {
   try {
     console.log("Intentando sincronizar la base de datos...");
-
-    // No necesitamos cerrar la conexión manualmente al inicio
-    // Sequelize manejará la conexión automáticamente al sincronizar
 
     // Deshabilitar chequeos de claves foráneas (si usas MySQL)
     await db.sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
@@ -56,34 +64,37 @@ const initializeDatabase = async () => {
     console.log("Usuario administrador creado correctamente");
   } catch (err) {
     console.error("Error al sincronizar la base de datos:", err);
-    process.exit(1); // Termina el proceso si falla la sincronización
+    process.exit(1);
   }
 };
 
-// Rutas
-require("./routes/auth.routes")(app);
-require("./routes/user.routes")(app);
-require("./routes/client.routes")(app);
-require("./routes/servicePersonnel.routes")(app);
-require("./routes/request.routes")(app);
-require("./routes/workOrder.routes")(app);
-require("./routes/task.routes")(app);
-require("./routes/invoice.routes")(app);
-require("./routes/notification.routes")(app);
-require("./routes/calendar.routes")(app);
-require("./routes/attachment.routes")(app);
-require("./routes/dashboard.routes")(app);
+// server/server.js (fragmento relevante)
+// Rutas con prefijo /api
+app.use('/api', require("./routes/auth.routes"));
+app.use('/api', require("./routes/user.routes"));
+app.use('/api', require("./routes/client.routes"));
+app.use('/api', require("./routes/servicePersonnel.routes"));
+app.use('/api', require("./routes/request.routes"));
+app.use('/api', require("./routes/workOrder.routes"));
+app.use('/api', require("./routes/task.routes"));
+app.use('/api', require("./routes/invoice.routes"));
+app.use('/api', require("./routes/notification.routes"));
+app.use('/api', require("./routes/calendar.routes"));
+app.use('/api', require("./routes/attachment.routes"));
+app.use('/api', require("./routes/dashboard.routes"));
+app.use('/api', require("./routes/quote.routes"));
 
 // Ruta simple para probar
 app.get("/", (req, res) => {
   res.json({ message: "Welcome to Building Maintenance System API." });
 });
 
-// Iniciar el servidor solo después de sincronizar la base de datos
+// Iniciar el servidor solo después de probar la conexión y sincronizar
 const PORT = process.env.PORT || 8080;
 
 const startServer = async () => {
-  await initializeDatabase(); // Espera a que la base de datos esté lista
+  await testDatabaseConnection();
+  await initializeDatabase();
   app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}.`);
   });

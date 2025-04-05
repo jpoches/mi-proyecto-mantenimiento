@@ -1,4 +1,58 @@
-node_modules/
-*.log
-dist/
+# -------------------------
+# Global (aplica a todo el repo)
+# -------------------------
+.env
 *.env
+*.log
+.DS_Store
+Thumbs.db
+
+# Sistema
+node_modules/
+dist/
+build/
+uploads/
+.vscode/
+.idea/
+
+# Archivos temporales
+*.local
+*.cache
+*.tmp
+
+# -------------------------
+# CLIENT (React + Vite)
+# -------------------------
+client/node_modules/
+client/.env
+client/.DS_Store
+client/dist/
+client/build/
+client/.vite/
+client/coverage/
+client/.next/
+client/.turbo/
+client/.eslintcache
+
+# -------------------------
+# SERVER (Node + Express)
+# -------------------------
+server/node_modules/
+server/.env
+server/uploads/
+server/.DS_Store
+server/coverage/
+server/.eslintcache
+
+# -------------------------
+# Archivos del editor
+# -------------------------
+*.swp
+*.swo
+*.bak
+*.log
+
+# -------------------------
+# Backup SQL (lo dejamos fuera del ignore si querés subirlo)
+# -------------------------
+# init.sql

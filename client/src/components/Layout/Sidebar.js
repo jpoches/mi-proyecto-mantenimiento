@@ -3,7 +3,8 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   FaTimes, FaHome, FaUsers, FaUserTie, FaClipboardList, 
-  FaTasks, FaFileInvoiceDollar, FaCalendarAlt, FaUser 
+  FaTasks, FaFileInvoiceDollar, FaCalendarAlt, FaUser, 
+  FaMoneyCheckAlt // Nuevo ícono para cotizaciones
 } from 'react-icons/fa';
 import Logo from './Logo';
 
@@ -52,6 +53,12 @@ const Sidebar = ({ isOpen, toggleSidebar, userRole }) => {
       text: 'Tareas',
       icon: <FaTasks className="w-5 h-5" />,
       roles: ['admin', 'technician']
+    },
+    {
+      path: '/quotes', // Nueva entrada para cotizaciones
+      text: 'Cotizaciones',
+      icon: <FaMoneyCheckAlt className="w-5 h-5" />,
+      roles: ['admin', 'client'] // Visible para admin y clientes
     },
     {
       path: '/invoices',

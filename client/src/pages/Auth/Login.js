@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { toast } from 'react-toastify';
 import { FaUser, FaLock, FaSignInAlt } from 'react-icons/fa';
-import axios from 'axios'; // Importar axios
+import axios from '../../utils/axios'; // Usa la instancia personalizada
 
 const Login = () => {
   const { register, handleSubmit, formState: { errors } } = useForm();
@@ -14,18 +14,18 @@ const Login = () => {
   const onSubmit = async (data) => {
     setIsSubmitting(true);
     try {
-      const response = await axios.post('http://localhost:8080/api/auth/signin', {
+      const response = await axios.post('/auth/signin', {
         username: data.username,
         password: data.password
       });
-      
+
       console.log('Respuesta del servidor:', response.data);
-      
+
       localStorage.setItem('token', response.data.accessToken);
       localStorage.setItem('user', JSON.stringify(response.data.user));
-      
+
       toast.success('Inicio de sesión exitoso');
-      navigate('/dashboard'); // Usar navigate en lugar de window.location.href
+      navigate('/dashboard');
     } catch (error) {
       console.error('Error de login:', error);
       toast.error(error.response?.data?.message || 'Error al iniciar sesión');
@@ -61,7 +61,11 @@ const Login = () => {
                   type="text"
                   autoComplete="username"
                   {...register('username', { 
-                    required: 'El usuario es requerido' 
+                    required: 'El usuario es requerido',
+                    minLength: {
+                      value: 3,
+                      message: 'El usuario debe tener al menos 3 caracteres'
+                    }
                   })}
                   className={`appearance-none rounded-none relative block w-full px-3 py-3 pl-10 border ${
                     errors.username ? 'border-red-300' : 'border-gray-300'
@@ -89,7 +93,11 @@ const Login = () => {
                   type="password"
                   autoComplete="current-password"
                   {...register('password', { 
-                    required: 'La contraseña es requerida' 
+                    required: 'La contraseña es requerida',
+                    minLength: {
+                      value: 6,
+                      message: 'La contraseña debe tener al menos 6 caracteres'
+                    }
                   })}
                   className={`appearance-none rounded-none relative block w-full px-3 py-3 pl-10 border ${
                     errors.password ? 'border-red-300' : 'border-gray-300'

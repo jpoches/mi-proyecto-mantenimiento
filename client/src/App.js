@@ -22,11 +22,11 @@ import Tasks from './pages/Tasks/Tasks';
 import Invoices from './pages/Invoices/Invoices';
 import Calendar from './pages/Calendar/Calendar';
 import Profile from './pages/Profile/Profile';
+import Quotes from './pages/Quotes/Quotes'; // Importar Quotes
 import NotFound from './pages/NotFound/NotFound';
 
 // En App.js o donde tengas definido ProtectedRoute
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  // Verificar directamente desde localStorage en lugar de confiar en el contexto
   const token = localStorage.getItem("token");
   const userString = localStorage.getItem("user");
   
@@ -38,7 +38,6 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     return <Navigate to="/login" />;
   }
   
-  // Si hay roles permitidos, verificarlos
   if (allowedRoles) {
     const user = JSON.parse(userString);
     console.log('Rol del usuario:', user.role);
@@ -76,6 +75,11 @@ function App() {
             <Route path="requests" element={
               <ProtectedRoute allowedRoles={['client', 'admin']}>
                 <Requests />
+              </ProtectedRoute>
+            } />
+            <Route path="quotes" element={ // Nueva ruta para Quotes
+              <ProtectedRoute allowedRoles={['client', 'admin']}>
+                <Quotes />
               </ProtectedRoute>
             } />
             <Route path="calendar" element={<Calendar />} />
