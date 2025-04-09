@@ -1,17 +1,16 @@
 // server/routes/attachment.routes.js
-module.exports = app => {
-    const attachments = require("../controllers/attachment.controller");
-    const { authJwt } = require("../middleware");
-    const router = require("express").Router();
-  
-    // Aplicar middleware para proteger rutas
-    router.use(authJwt.verifyToken);
-  
-    // Rutas para archivos adjuntos
-    router.get("/request/:requestId", attachments.findByRequest);
-    router.get("/:id", attachments.findOne);
-    router.get("/:id/download", attachments.download);
-    router.delete("/:id", attachments.delete);
-  
-    app.use("/api/attachments", router);
-  };
+const express = require('express');
+const router = express.Router();
+const controller = require("../controllers/attachment.controller");
+const { authJwt } = require("../middleware");
+
+// Middleware para verificar token
+router.use(authJwt.verifyToken);
+
+// Rutas para archivos adjuntos
+router.get("/request/:requestId", controller.findByRequest);
+router.get("/:id", controller.findOne);
+router.get("/:id/download", controller.download);
+router.delete("/:id", controller.delete);
+
+module.exports = router;

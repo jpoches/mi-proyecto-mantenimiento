@@ -1,13 +1,14 @@
-// client/src/pages/Requests/Requests.js
+// client/src/pages/Requests/Requests.js (corregido)
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { FaPlus, FaFilter, FaSearch } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
-import axios from 'axios';
-import { API_URL } from '../../config/api';
 import RequestList from '../../components/Requests/RequestList';
 import RequestForm from '../../components/Requests/RequestForm';
 import RequestDetails from '../../components/Requests/RequestDetails';
+import LoadingOverlay from '../../components/UI/LoadingOverlay';
+import axios from '../../utils/axios';
+import { API_URL } from '../../config/api';
 
 const Requests = () => {
   const { currentUser } = useAuth();
@@ -22,38 +23,60 @@ const Requests = () => {
 
   // Cargar solicitudes
   useEffect(() => {
-    const fetchRequests = async () => {
-      try {
-        setLoading(true);
-        const endpoint = currentUser.role === 'admin' 
-          ? `${API_URL}/requests`
-          : `${API_URL}/requests/client/${currentUser.clientInfo.id}`;
-        
-        const response = await axios.get(endpoint);
-        setRequests(response.data);
-        setFilteredRequests(response.data);
-      } catch (error) {
-        console.error('Error fetching requests:', error);
-        toast.error('Error al cargar las solicitudes');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchRequests();
   }, [currentUser]);
 
-  // Filtrar solicitudes
+  const fetchRequests = async () => {
+    try {
+      setLoading(true);
+      let response;
+
+      if (currentUser?.role === 'admin') {
+        response = await axios.get(`${API_URL}/requests`);
+      } else if (currentUser?.role === 'client' && currentUser?.clientInfo?.id) {
+        response = await axios.get(`${API_URL}/requests/client/${currentUser.clientInfo.id}`);
+      } else {
+        // Si no es admin ni cliente con ID, inicializar como array vacío
+        setRequests([]);
+        setFilteredRequests([]);
+        setLoading(false);
+        return;
+      }
+
+      const data = response.data || [];
+      setRequests(data);
+      setFilteredRequests(data);
+    } catch (error) {
+      console.error('Error fetching requests:', error);
+      toast.error('Error al cargar las solicitudes');
+      // Inicializar como array vacío en caso de error
+      setRequests([]);
+      setFilteredRequests([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Filtrar solicitudes cuando cambia el término de búsqueda o el filtro de estado
   useEffect(() => {
-    let result = requests;
+    if (!Array.isArray(requests)) {
+      setFilteredRequests([]);
+      return;
+    }
     
+    let result = [...requests];
+    
+    // Filtrar por término de búsqueda
     if (searchTerm) {
+      const term = searchTerm.toLowerCase();
       result = result.filter(request => 
-        request.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        request.description.toLowerCase().includes(searchTerm.toLowerCase())
+        (request.title && request.title.toLowerCase().includes(term)) ||
+        (request.description && request.description.toLowerCase().includes(term)) ||
+        (request.location && request.location.toLowerCase().includes(term))
       );
     }
     
+    // Filtrar por estado
     if (statusFilter !== 'all') {
       result = result.filter(request => request.status === statusFilter);
     }
@@ -62,35 +85,39 @@ const Requests = () => {
   }, [requests, searchTerm, statusFilter]);
 
   // Crear nueva solicitud
-  const handleCreateRequest = async (requestData) => {
+  const handleCreateRequest = async (formData) => {
     try {
-      const formData = new FormData();
+      // Extraer archivos adjuntos del objeto de datos
+      const { attachments, ...data } = formData;
       
-      // Agregar datos del formulario
-      Object.keys(requestData).forEach(key => {
-        if (key !== 'attachments') {
-          formData.append(key, requestData[key]);
-        }
+      // Si es un cliente, agregar su ID
+      if (currentUser.role === 'client' && currentUser.clientInfo) {
+        data.client_id = currentUser.clientInfo.id;
+      }
+      
+      // Preparar formData para enviar archivos
+      const requestFormData = new FormData();
+      
+      // Agregar datos de texto al FormData
+      Object.keys(data).forEach(key => {
+        requestFormData.append(key, data[key]);
       });
       
-      // Agregar archivos adjuntos
-      if (requestData.attachments && requestData.attachments.length > 0) {
-        for (let i = 0; i < requestData.attachments.length; i++) {
-          formData.append('attachments', requestData.attachments[i]);
-        }
+      // Agregar archivos adjuntos si existen
+      if (attachments && attachments.length > 0) {
+        attachments.forEach(file => {
+          requestFormData.append('attachments', file);
+        });
       }
       
-      // Agregar ID del cliente
-      if (currentUser.role === 'client') {
-        formData.append('client_id', currentUser.clientInfo.id);
-      }
-      
-      const response = await axios.post(`${API_URL}/requests`, formData, {
+      // Crear la solicitud con archivos adjuntos si los hay
+      const response = await axios.post(`${API_URL}/requests`, requestFormData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
       });
       
+      // Actualizar la lista de solicitudes
       setRequests([response.data, ...requests]);
       setShowForm(false);
       toast.success('Solicitud creada exitosamente');
@@ -103,8 +130,12 @@ const Requests = () => {
   // Ver detalles de una solicitud
   const handleViewRequest = (requestId) => {
     const request = requests.find(r => r.id === requestId);
-    setSelectedRequest(request);
-    setShowDetails(true);
+    if (request) {
+      setSelectedRequest(request);
+      setShowDetails(true);
+    } else {
+      toast.error('Solicitud no encontrada');
+    }
   };
 
   // Actualizar solicitud
@@ -112,17 +143,19 @@ const Requests = () => {
     try {
       await axios.patch(`${API_URL}/requests/${requestId}`, { status });
       
+      // Actualizar la lista de solicitudes
       const updatedRequests = requests.map(request => 
         request.id === requestId ? { ...request, status } : request
       );
       
       setRequests(updatedRequests);
       
+      // Si hay una solicitud seleccionada, actualizar su estado también
       if (selectedRequest && selectedRequest.id === requestId) {
         setSelectedRequest({ ...selectedRequest, status });
       }
-      
-      toast.success('Solicitud actualizada exitosamente');
+
+      toast.success(`Solicitud ${status === 'approved' ? 'aprobada' : status === 'rejected' ? 'rechazada' : 'actualizada'} exitosamente`);
     } catch (error) {
       console.error('Error updating request:', error);
       toast.error('Error al actualizar la solicitud');
@@ -131,23 +164,27 @@ const Requests = () => {
 
   // Eliminar solicitud
   const handleDeleteRequest = async (requestId) => {
-    if (window.confirm('¿Está seguro de eliminar esta solicitud?')) {
-      try {
-        await axios.delete(`${API_URL}/requests/${requestId}`);
-        
-        const updatedRequests = requests.filter(request => request.id !== requestId);
-        setRequests(updatedRequests);
-        
-        if (showDetails && selectedRequest && selectedRequest.id === requestId) {
-          setShowDetails(false);
-          setSelectedRequest(null);
-        }
-        
-        toast.success('Solicitud eliminada exitosamente');
-      } catch (error) {
-        console.error('Error deleting request:', error);
-        toast.error('Error al eliminar la solicitud');
+    try {
+      if (!window.confirm('¿Está seguro de eliminar esta solicitud?')) {
+        return;
       }
+      
+      await axios.delete(`${API_URL}/requests/${requestId}`);
+      
+      // Actualizar la lista de solicitudes
+      const updatedRequests = requests.filter(request => request.id !== requestId);
+      setRequests(updatedRequests);
+      
+      // Si hay una solicitud seleccionada, cerrar el modal de detalles
+      if (showDetails && selectedRequest && selectedRequest.id === requestId) {
+        setShowDetails(false);
+        setSelectedRequest(null);
+      }
+      
+      toast.success('Solicitud eliminada exitosamente');
+    } catch (error) {
+      console.error('Error deleting request:', error);
+      toast.error('Error al eliminar la solicitud');
     }
   };
 
@@ -192,20 +229,16 @@ const Requests = () => {
         </button>
       </div>
       
-      {/* Lista de solicitudes */}
-      {loading ? (
-        <div className="flex justify-center my-10">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-        </div>
-      ) : (
+      {/* Lista de solicitudes con overlay de carga */}
+      <LoadingOverlay loading={loading}>
         <RequestList
-          requests={filteredRequests}
+          requests={filteredRequests || []}
           onView={handleViewRequest}
           onUpdate={handleUpdateRequest}
           onDelete={handleDeleteRequest}
-          isAdmin={currentUser.role === 'admin'}
+          isAdmin={currentUser?.role === 'admin'}
         />
-      )}
+      </LoadingOverlay>
       
       {/* Modal de formulario de nueva solicitud */}
       {showForm && (
@@ -222,7 +255,7 @@ const Requests = () => {
           onClose={() => setShowDetails(false)}
           onUpdate={handleUpdateRequest}
           onDelete={handleDeleteRequest}
-          isAdmin={currentUser.role === 'admin'}
+          isAdmin={currentUser?.role === 'admin'}
         />
       )}
     </div>

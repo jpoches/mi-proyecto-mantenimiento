@@ -1,10 +1,10 @@
-// client/src/pages/Clients/Clients.js
+// client/src/pages/Clients/Clients.js (corregido)
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { FaPlus, FaEdit, FaTrash, FaSearch } from 'react-icons/fa';
-import axios from 'axios';
-import { API_URL } from '../../config/api';
+import ClientService from '../../services/client.service';
 import ClientForm from '../../components/Clients/ClientForm';
+import LoadingOverlay from '../../components/UI/LoadingOverlay';
 
 const Clients = () => {
   const [clients, setClients] = useState([]);
@@ -20,22 +20,24 @@ const Clients = () => {
   const fetchClients = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/clients`);
-      setClients(response.data);
-      setLoading(false);
+      const data = await ClientService.getAll();
+      // Asegurarse de que data es un array
+      setClients(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching clients:', error);
       toast.error('Error al cargar los clientes');
+    } finally {
       setLoading(false);
     }
   };
 
   const handleCreateClient = async (data) => {
     try {
-      const response = await axios.post(`${API_URL}/clients`, data);
-      setClients([...clients, response.data]);
-      toast.success('Cliente creado exitosamente');
+      const response = await ClientService.create(data);
+      // Asegurarse de que clients es un array antes de usar spread
+      setClients(prevClients => Array.isArray(prevClients) ? [...prevClients, response] : [response]);
       setShowForm(false);
+      toast.success('Cliente creado exitosamente');
     } catch (error) {
       console.error('Error creating client:', error);
       toast.error('Error al crear el cliente');
@@ -45,13 +47,16 @@ const Clients = () => {
 
   const handleUpdateClient = async (data) => {
     try {
-      await axios.put(`${API_URL}/clients/${editingClient.id}`, data);
-      const updatedClients = clients.map(client => 
-        client.id === editingClient.id ? { ...client, ...data } : client
-      );
-      setClients(updatedClients);
-      toast.success('Cliente actualizado exitosamente');
+      await ClientService.update(editingClient.id, data);
+      // Asegurarse de que clients es un array antes de mapear
+      if (Array.isArray(clients)) {
+        const updatedClients = clients.map(client => 
+          client.id === editingClient.id ? { ...client, ...data } : client
+        );
+        setClients(updatedClients);
+      }
       setEditingClient(null);
+      toast.success('Cliente actualizado exitosamente');
     } catch (error) {
       console.error('Error updating client:', error);
       toast.error('Error al actualizar el cliente');
@@ -60,15 +65,16 @@ const Clients = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('¿Está seguro de eliminar este cliente?')) {
-      try {
-        await axios.delete(`${API_URL}/clients/${id}`);
+    try {
+      await ClientService.delete(id);
+      // Asegurarse de que clients es un array antes de filtrar
+      if (Array.isArray(clients)) {
         setClients(clients.filter(client => client.id !== id));
-        toast.success('Cliente eliminado exitosamente');
-      } catch (error) {
-        console.error('Error deleting client:', error);
-        toast.error('Error al eliminar el cliente');
       }
+      toast.success('Cliente eliminado exitosamente');
+    } catch (error) {
+      console.error('Error deleting client:', error);
+      toast.error('Error al eliminar el cliente');
     }
   };
 
@@ -89,11 +95,12 @@ const Clients = () => {
     setEditingClient(null);
   };
 
-  const filteredClients = clients.filter(client => {
+  // Asegurarse de que clients es un array antes de filtrar
+  const filteredClients = Array.isArray(clients) ? clients.filter(client => {
     return client.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.phone?.toLowerCase().includes(searchTerm.toLowerCase());
-  });
+  }) : [];
 
   return (
     <div>
@@ -120,78 +127,76 @@ const Clients = () => {
         </button>
       </div>
       
-      {/* Lista de clientes */}
-      {loading ? (
-        <div className="flex justify-center my-10">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
-        </div>
-      ) : filteredClients.length > 0 ? (
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Nombre
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Email
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Teléfono
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Dirección
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredClients.map((client) => (
-                  <tr key={client.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {client.name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {client.email}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {client.phone}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {client.address}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end space-x-2">
-                        <button
-                          onClick={() => handleEdit(client)}
-                          className="text-primary-600 hover:text-primary-900 transition-colors"
-                          title="Editar"
-                        >
-                          <FaEdit className="hover:scale-110 transition-transform" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(client.id)}
-                          className="text-red-600 hover:text-red-900 transition-colors"
-                          title="Eliminar"
-                        >
-                          <FaTrash className="hover:scale-110 transition-transform" />
-                        </button>
-                      </div>
-                    </td>
+      {/* Lista de clientes con overlay de carga */}
+      <LoadingOverlay loading={loading}>
+        {filteredClients.length > 0 ? (
+          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Nombre
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Email
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Teléfono
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Dirección
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Acciones
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredClients.map((client) => (
+                    <tr key={client.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {client.name}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {client.email}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {client.phone}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {client.address}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex justify-end space-x-2">
+                          <button
+                            onClick={() => handleEdit(client)}
+                            className="text-primary-600 hover:text-primary-900 transition-colors"
+                            title="Editar"
+                          >
+                            <FaEdit className="hover:scale-110 transition-transform" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(client.id)}
+                            className="text-red-600 hover:text-red-900 transition-colors"
+                            title="Eliminar"
+                          >
+                            <FaTrash className="hover:scale-110 transition-transform" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      ) : (
-        <div className="bg-white p-6 rounded-lg shadow-md text-center">
-          <p className="text-gray-500">No se encontraron clientes.</p>
-        </div>
-      )}
+        ) : (
+          <div className="bg-white p-6 rounded-lg shadow-md text-center">
+            <p className="text-gray-500">No se encontraron clientes.</p>
+          </div>
+        )}
+      </LoadingOverlay>
       
       {/* Modal de formulario */}
       {(showForm || editingClient) && (

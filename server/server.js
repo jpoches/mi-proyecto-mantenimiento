@@ -2,105 +2,142 @@
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
+const path = require("path");
 
+// Cargar variables de entorno
 dotenv.config();
 
 const app = express();
 
 // Configuración CORS
-const corsOptions = {
-  origin: "http://localhost:3000"
-};
+app.use(cors({
+  origin: process.env.CLIENT_URL || "http://localhost:3000",
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'x-access-token',
+    'Origin',
+    'Accept'
+  ]
+}));
 
-app.use(cors(corsOptions));
-
-// Parse requests of content-type - application/json
+// Parse requests de application/json
 app.use(express.json());
 
-// Parse requests of content-type - application/x-www-form-urlencoded
+// Parse requests de application/x-www-form-urlencoded
 app.use(express.urlencoded({ extended: true }));
 
-// Carpeta para archivos estáticos y uploads
-app.use('/uploads', express.static('uploads'));
+// Configuración de carpeta estática para archivos subidos
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Conexión a la base de datos
 const db = require("./models");
 
-// Función para probar la conexión a la base de datos
-const testDatabaseConnection = async () => {
-  try {
-    await db.sequelize.authenticate();
-    console.log("Conexión a la base de datos establecida correctamente.");
-  } catch (error) {
-    console.error("No se pudo conectar a la base de datos:", error);
-    process.exit(1);
-  }
-};
-
 // Función para inicializar la base de datos
-const initializeDatabase = async () => {
+const initializeDatabase = async (forceReset = false) => {
   try {
-    console.log("Intentando sincronizar la base de datos...");
+    console.log("Sincronizando la base de datos...");
 
-    // Deshabilitar chequeos de claves foráneas (si usas MySQL)
-    await db.sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
+    if (forceReset) {
+      await db.sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
+    }
     
-    // Sincronizar modelos con la base de datos (force: true recrea las tablas)
-    await db.sequelize.sync({ force: true });
+    await db.sequelize.sync({ force: forceReset });
     
-    // Rehabilitar chequeos de claves foráneas
-    await db.sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+    if (forceReset) {
+      await db.sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+      
+      // Crear usuario administrador inicial
+      const bcrypt = require("bcryptjs");
+      await db.users.create({
+        username: "admin",
+        password: bcrypt.hashSync("admin123", 8),
+        email: "admin@example.com",
+        role: "admin"
+      });
+      
+      console.log("Usuario administrador creado correctamente");
+    }
     
     console.log("Base de datos sincronizada correctamente");
-
-    // Crear usuario administrador inicial
-    const bcrypt = require("bcryptjs");
-    await db.users.create({
-      username: "admin",
-      password: bcrypt.hashSync("admin123", 8),
-      email: "admin@example.com",
-      role: "admin"
-    });
-    
-    console.log("Usuario administrador creado correctamente");
+    return true;
   } catch (err) {
     console.error("Error al sincronizar la base de datos:", err);
-    process.exit(1);
+    return false;
   }
 };
 
-// server/server.js (fragmento relevante)
-// Rutas con prefijo /api
-app.use('/api', require("./routes/auth.routes"));
-app.use('/api', require("./routes/user.routes"));
-app.use('/api', require("./routes/client.routes"));
-app.use('/api', require("./routes/servicePersonnel.routes"));
-app.use('/api', require("./routes/request.routes"));
-app.use('/api', require("./routes/workOrder.routes"));
-app.use('/api', require("./routes/task.routes"));
-app.use('/api', require("./routes/invoice.routes"));
-app.use('/api', require("./routes/notification.routes"));
-app.use('/api', require("./routes/calendar.routes"));
-app.use('/api', require("./routes/attachment.routes"));
-app.use('/api', require("./routes/dashboard.routes"));
-app.use('/api', require("./routes/quote.routes"));
+// Rutas API
+app.use('/api/auth', require('./routes/auth.routes'));
+app.use('/api/users', require('./routes/user.routes'));
+app.use('/api/clients', require('./routes/client.routes'));
+app.use('/api/service-personnel', require('./routes/servicePersonnel.routes'));
+app.use('/api/requests', require('./routes/request.routes'));
+app.use('/api/work-orders', require('./routes/workOrder.routes'));
+app.use('/api/tasks', require('./routes/task.routes'));
+app.use('/api/invoices', require('./routes/invoice.routes'));
+app.use('/api/notifications', require('./routes/notification.routes'));
+app.use('/api/calendar', require('./routes/calendar.routes'));
+app.use('/api/attachments', require('./routes/attachment.routes'));
+app.use('/api/dashboard', require('./routes/dashboard.routes'));
+app.use('/api/quotes', require('./routes/quote.routes'));
 
-// Ruta simple para probar
-app.get("/", (req, res) => {
-  res.json({ message: "Welcome to Building Maintenance System API." });
+// Ruta principal para verificar que el servidor está en funcionamiento
+app.get("/api", (req, res) => {
+  res.json({ 
+    message: "Welcome to Building Maintenance System API.",
+    version: "1.0.0",
+    status: "running"
+  });
 });
 
-// Iniciar el servidor solo después de probar la conexión y sincronizar
+// Manejo de rutas no encontradas
+app.use((req, res) => {
+  res.status(404).json({ message: "Ruta no encontrada" });
+});
+
+// Manejo de errores global
+app.use((err, req, res, next) => {
+  console.error('Error en el servidor:', err);
+  res.status(500).json({ 
+    message: "Error interno del servidor",
+    error: process.env.NODE_ENV === 'production' ? undefined : err.message
+  });
+});
+
+// Iniciar el servidor
 const PORT = process.env.PORT || 8080;
 
 const startServer = async () => {
-  await testDatabaseConnection();
-  await initializeDatabase();
-  app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}.`);
-  });
+  // Comprobar si se pasa argumento para resetear la base de datos
+  const forceReset = process.argv.includes('--reset-db');
+  
+  try {
+    // Comprobar conexión a la base de datos
+    await db.sequelize.authenticate();
+    console.log("Conexión a la base de datos establecida correctamente.");
+    
+    // Inicializar la base de datos
+    await initializeDatabase(forceReset);
+    
+    // Iniciar servidor
+    app.listen(PORT, () => {
+      console.log(`Servidor en ejecución en el puerto ${PORT}.`);
+      console.log(`API accesible en http://localhost:${PORT}/api`);
+    });
+  } catch (error) {
+    console.error("Error al iniciar el servidor:", error);
+    process.exit(1);
+  }
 };
 
-startServer().catch(err => {
-  console.error("Error al iniciar el servidor:", err);
-  process.exit(1);
+// Iniciar la aplicación
+startServer();
+
+// Manejar el cierre del servidor
+process.on('SIGINT', () => {
+  console.log('Cerrando servidor...');
+  process.exit(0);
 });

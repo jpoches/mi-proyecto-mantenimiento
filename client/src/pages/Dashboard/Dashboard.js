@@ -1,97 +1,74 @@
 // client/src/pages/Dashboard/Dashboard.js
 import React, { useState, useEffect } from 'react';
-import { FaUsers, FaClipboardList, FaTasks, FaFileInvoiceDollar, FaExclamationCircle } from 'react-icons/fa';
+import { FaUsers, FaClipboardList, FaTasks, FaFileInvoiceDollar } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
-import axios from 'axios';
-import { API_URL } from '../../config/api';
+import { DashboardService } from '../../services';
 import StatCard from '../../components/Dashboard/StatCard';
 import RecentRequests from '../../components/Dashboard/RecentRequests';
 import RecentWorkOrders from '../../components/Dashboard/RecentWorkOrders';
 import PendingInvoices from '../../components/Dashboard/PendingInvoices';
 import UpcomingMaintenance from '../../components/Dashboard/UpcomingMaintenance';
+import DashboardCharts from '../../components/Dashboard/DashboardCharts';
+import LoadingOverlay from '../../components/UI/LoadingOverlay';
 
 const Dashboard = () => {
   const { currentUser } = useAuth();
-  const [stats, setStats] = useState({
-    totalClients: 0,
-    totalTechnicians: 0,
-    pendingRequests: 0,
-    activeWorkOrders: 0,
-    completedTasks: 0,
-    pendingInvoices: 0
+  const [dashboardData, setDashboardData] = useState({
+    stats: {
+      totalClients: 0,
+      totalTechnicians: 0,
+      pendingRequests: 0,
+      activeWorkOrders: 0,
+      completedTasks: 0,
+      pendingInvoices: 0,
+      weeklyStats: [],
+      statusDistribution: []
+    },
+    recentRequests: [],
+    recentWorkOrders: [],
+    pendingInvoices: [],
+    upcomingMaintenance: []
   });
-  const [recentRequests, setRecentRequests] = useState([]);
-  const [recentWorkOrders, setRecentWorkOrders] = useState([]);
-  const [pendingInvoices, setPendingInvoices] = useState([]);
-  const [upcomingMaintenance, setUpcomingMaintenance] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setLoading(true);
-        
-        // Obtener estadísticas según el rol
-        const statsEndpoint = currentUser.role === 'admin' 
-          ? `${API_URL}/dashboard/admin-stats` 
-          : `${API_URL}/dashboard/user-stats/${currentUser.id}`;
-          
-        const statsResponse = await axios.get(statsEndpoint);
-        setStats(statsResponse.data);
-
-        // Obtener datos recientes según el rol
-        let requestsEndpoint, workOrdersEndpoint, invoicesEndpoint, maintenanceEndpoint;
-        
-        if (currentUser.role === 'admin') {
-          requestsEndpoint = `${API_URL}/requests/recent`;
-          workOrdersEndpoint = `${API_URL}/work-orders/recent`;
-          invoicesEndpoint = `${API_URL}/invoices/pending`;
-          maintenanceEndpoint = `${API_URL}/calendar/upcoming`;
-        } else if (currentUser.role === 'client') {
-          requestsEndpoint = `${API_URL}/requests/client/${currentUser.clientInfo.id}/recent`;
-          workOrdersEndpoint = null;
-          invoicesEndpoint = `${API_URL}/invoices/client/${currentUser.clientInfo.id}/pending`;
-          maintenanceEndpoint = `${API_URL}/calendar/client/${currentUser.clientInfo.id}/upcoming`;
-        } else if (currentUser.role === 'technician') {
-          requestsEndpoint = null;
-          workOrdersEndpoint = `${API_URL}/work-orders/technician/${currentUser.technicianInfo.id}/recent`;
-          invoicesEndpoint = null;
-          maintenanceEndpoint = `${API_URL}/calendar/technician/${currentUser.technicianInfo.id}/upcoming`;
-        }
-
-        // Realizar solicitudes en paralelo
-        const requests = [];
-
-        if (requestsEndpoint) {
-          requests.push(axios.get(requestsEndpoint).then(res => setRecentRequests(res.data)));
-        }
-        
-        if (workOrdersEndpoint) {
-          requests.push(axios.get(workOrdersEndpoint).then(res => setRecentWorkOrders(res.data)));
-        }
-        
-        if (invoicesEndpoint) {
-          requests.push(axios.get(invoicesEndpoint).then(res => setPendingInvoices(res.data)));
-        }
-        
-        if (maintenanceEndpoint) {
-          requests.push(axios.get(maintenanceEndpoint).then(res => setUpcomingMaintenance(res.data)));
-        }
-
-        await Promise.all(requests);
-        
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchDashboardData();
   }, [currentUser]);
 
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      
+      // Identificar IDs específicos según el rol
+      let clientId = null;
+      let technicianId = null;
+      
+      if (currentUser.role === 'client' && currentUser.clientInfo) {
+        clientId = currentUser.clientInfo.id;
+      } else if (currentUser.role === 'technician' && currentUser.technicianInfo) {
+        technicianId = currentUser.technicianInfo.id;
+      }
+      
+      // Obtener todos los datos del dashboard mediante el servicio
+      const data = await DashboardService.getDashboardData(
+        currentUser.role,
+        currentUser.id,
+        clientId,
+        technicianId
+      );
+      
+      setDashboardData(data);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Determinar qué estadísticas mostrar según el rol
   const getStatsCards = () => {
+    const { stats } = dashboardData;
+    
     if (currentUser.role === 'admin') {
       return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -170,51 +147,57 @@ const Dashboard = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
       
-      {getStatsCards()}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Sección de solicitudes recientes (para admin y cliente) */}
-        {(currentUser.role === 'admin' || currentUser.role === 'client') && (
-          <div className="bg-white p-4 rounded-lg shadow-md">
-            <h2 className="text-lg font-semibold mb-4">Solicitudes Recientes</h2>
-            <RecentRequests requests={recentRequests} />
+      <LoadingOverlay loading={loading}>
+        {/* Tarjetas de estadísticas */}
+        {getStatsCards()}
+        
+        {/* Gráficos para administrador */}
+        {currentUser.role === 'admin' && (
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold mb-3">Análisis y Tendencias</h2>
+            <DashboardCharts 
+              weeklyStats={dashboardData.stats.weeklyStats} 
+              statusDistribution={dashboardData.stats.statusDistribution} 
+            />
           </div>
         )}
 
-        {/* Sección de órdenes de trabajo recientes (para admin y técnico) */}
-        {(currentUser.role === 'admin' || currentUser.role === 'technician') && (
-          <div className="bg-white p-4 rounded-lg shadow-md">
-            <h2 className="text-lg font-semibold mb-4">Órdenes de Trabajo Recientes</h2>
-            <RecentWorkOrders workOrders={recentWorkOrders} />
-          </div>
-        )}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Sección de solicitudes recientes (para admin y cliente) */}
+          {(currentUser.role === 'admin' || currentUser.role === 'client') && (
+            <div className="bg-white p-4 rounded-lg shadow-md">
+              <h2 className="text-lg font-semibold mb-4">Solicitudes Recientes</h2>
+              <RecentRequests requests={dashboardData.recentRequests} />
+            </div>
+          )}
 
-        {/* Sección de facturas pendientes (para admin y cliente) */}
-        {(currentUser.role === 'admin' || currentUser.role === 'client') && (
-          <div className="bg-white p-4 rounded-lg shadow-md">
-            <h2 className="text-lg font-semibold mb-4">Facturas Pendientes</h2>
-            <PendingInvoices invoices={pendingInvoices} />
-          </div>
-        )}
+          {/* Sección de órdenes de trabajo recientes (para admin y técnico) */}
+          {(currentUser.role === 'admin' || currentUser.role === 'technician') && (
+            <div className="bg-white p-4 rounded-lg shadow-md">
+              <h2 className="text-lg font-semibold mb-4">Órdenes de Trabajo Recientes</h2>
+              <RecentWorkOrders workOrders={dashboardData.recentWorkOrders} />
+            </div>
+          )}
 
-        {/* Sección de mantenimientos próximos (para todos) */}
-        <div className="bg-white p-4 rounded-lg shadow-md">
-          <h2 className="text-lg font-semibold mb-4">Mantenimientos Próximos</h2>
-          <UpcomingMaintenance events={upcomingMaintenance} />
+          {/* Sección de facturas pendientes (para admin y cliente) */}
+          {(currentUser.role === 'admin' || currentUser.role === 'client') && (
+            <div className="bg-white p-4 rounded-lg shadow-md">
+              <h2 className="text-lg font-semibold mb-4">Facturas Pendientes</h2>
+              <PendingInvoices invoices={dashboardData.pendingInvoices} />
+            </div>
+          )}
+
+          {/* Sección de mantenimientos próximos (para todos) */}
+          <div className="bg-white p-4 rounded-lg shadow-md">
+            <h2 className="text-lg font-semibold mb-4">Mantenimientos Próximos</h2>
+            <UpcomingMaintenance events={dashboardData.upcomingMaintenance} />
+          </div>
         </div>
-      </div>
+      </LoadingOverlay>
     </div>
   );
 };

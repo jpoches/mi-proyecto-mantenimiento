@@ -1,4 +1,5 @@
 // tailwind.config.js
+/** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
     "./src/**/*.{js,jsx,ts,tsx}",
@@ -6,34 +7,51 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        primary: {
-          50: '#e6f0f7',
-          100: '#cce0ef',
-          200: '#99c2df',
-          300: '#66a3cf',
-          400: '#3385bf',
-          500: '#0064a4', // Azul oscuro principal (color predominante del logo)
-          600: '#005389',
-          700: '#00436e',
-          800: '#003252',
-          900: '#001a29',
+        'primary': {
+          50: '#eef2ff',
+          100: '#e0e7ff',
+          200: '#c7d2fe',
+          300: '#a5b4fc',
+          400: '#818cf8',
+          500: '#6366f1',
+          600: '#4f46e5',
+          700: '#4338ca',
+          800: '#3730a3',
+          900: '#312e81',
         },
-        secondary: {
-          50: '#fff8e6',
-          100: '#feefc3',
-          200: '#fde59f',
-          300: '#fcdb7c',
-          400: '#fbd159',
-          500: '#f9c642', // Mostaza (como en el logo)
-          600: '#e5a922',
-          700: '#b37d18',
-          800: '#805910',
-          900: '#4d3506',
+      },
+      animation: {
+        'spin-slow': 'spin 3s linear infinite',
+        'spin-reverse': 'spin-reverse 3s linear infinite',
+        'progress-bar': 'progress-bar 2s ease-in-out infinite',
+        'bounce-dot': 'bounce-dot 1.4s infinite ease-in-out',
+        'text-pulse': 'text-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+      },
+      keyframes: {
+        'spin-reverse': {
+          '0%': { transform: 'rotate(0deg)' },
+          '100%': { transform: 'rotate(-360deg)' },
         },
-        accent: {
-          teal: '#1ca3a0', // Color turquesa/cian del logo
-        }
-      }
+        'progress-bar': {
+          '0%': { width: '0%' },
+          '50%': { width: '70%' },
+          '100%': { width: '100%' },
+        },
+        'bounce-dot': {
+          '0%, 80%, 100%': { 
+            transform: 'scale(0)',
+            opacity: 0
+          },
+          '40%': { 
+            transform: 'scale(1)',
+            opacity: 1
+          },
+        },
+        'text-pulse': {
+          '0%, 100%': { opacity: 1 },
+          '50%': { opacity: 0.5 },
+        },
+      },
     },
   },
   plugins: [],

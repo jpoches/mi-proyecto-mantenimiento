@@ -1,65 +1,337 @@
-// client/src/services/api-service.js
-import axios from 'axios';
+// src/services/api-service.js
+import axios from '../utils/axios';
+import { API_URL } from '../config/api';
 
-// API base URL - asegúrate de que coincida con tu servidor
-const API_URL = 'http://localhost:8080/api';
-
-// Configurar axios con URL base
-const api = axios.create({
-  baseURL: API_URL,
-  timeout: 5000,
-  headers: {
-    'Content-Type': 'application/json'
-  }
-});
-
-// Interceptor para incluir el token en todas las solicitudes
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Servicios de autenticación
-export const authService = {
-  login: async (username, password) => {
+// Servicio para clientes
+export const clientService = {
+  getAll: async () => {
     try {
-      const response = await api.post('/auth/signin', { username, password });
-      if (response.data.accessToken) {
-        localStorage.setItem('token', response.data.accessToken);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-      }
+      const response = await axios.get('/clients');
       return response.data;
     } catch (error) {
-      console.error('Error de login:', error);
+      console.error('Error fetching clients:', error);
       throw error;
     }
   },
 
-  logout: () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+  getById: async (id) => {
+    try {
+      const response = await axios.get(`/clients/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching client ${id}:`, error);
+      throw error;
+    }
   },
 
-  register: async (userData) => {
-    return await api.post('/auth/signup', userData);
+  create: async (data) => {
+    try {
+      const response = await axios.post('/clients', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating client:', error);
+      throw error;
+    }
   },
 
-  isAuthenticated: () => {
-    return !!localStorage.getItem('token');
+  update: async (id, data) => {
+    try {
+      const response = await axios.put(`/clients/${id}`, data);
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating client ${id}:`, error);
+      throw error;
+    }
   },
 
-  getCurrentUser: () => {
-    const user = localStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
+  delete: async (id) => {
+    try {
+      const response = await axios.delete(`/clients/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error deleting client ${id}:`, error);
+      throw error;
+    }
   }
 };
 
-export default api;
+// Servicio para personal de servicio
+export const servicePersonnelService = {
+  getAll: async () => {
+    try {
+      const response = await axios.get('/service-personnel');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching service personnel:', error);
+      throw error;
+    }
+  },
+
+  getById: async (id) => {
+    try {
+      const response = await axios.get(`/service-personnel/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching service personnel ${id}:`, error);
+      throw error;
+    }
+  },
+
+  getAvailable: async () => {
+    try {
+      const response = await axios.get('/service-personnel/available');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching available service personnel:', error);
+      throw error;
+    }
+  },
+
+  create: async (data) => {
+    try {
+      const response = await axios.post('/service-personnel', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating service personnel:', error);
+      throw error;
+    }
+  },
+
+  update: async (id, data) => {
+    try {
+      const response = await axios.put(`/service-personnel/${id}`, data);
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating service personnel ${id}:`, error);
+      throw error;
+    }
+  },
+
+  delete: async (id) => {
+    try {
+      const response = await axios.delete(`/service-personnel/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error deleting service personnel ${id}:`, error);
+      throw error;
+    }
+  }
+};
+
+// Servicio para solicitudes
+export const requestService = {
+  getAll: async () => {
+    try {
+      const response = await axios.get('/requests');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching requests:', error);
+      throw error;
+    }
+  },
+
+  getById: async (id) => {
+    try {
+      const response = await axios.get(`/requests/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching request ${id}:`, error);
+      throw error;
+    }
+  },
+
+  getRecent: async () => {
+    try {
+      const response = await axios.get('/requests/recent');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching recent requests:', error);
+      throw error;
+    }
+  },
+
+  getRecentByClient: async (clientId) => {
+    try {
+      const response = await axios.get(`/requests/client/${clientId}/recent`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching recent requests for client ${clientId}:`, error);
+      throw error;
+    }
+  },
+
+  getByClient: async (clientId) => {
+    try {
+      const response = await axios.get(`/requests/client/${clientId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching requests for client ${clientId}:`, error);
+      throw error;
+    }
+  },
+
+  create: async (data, attachments = []) => {
+    try {
+      if (attachments && attachments.length > 0) {
+        const formData = new FormData();
+        
+        // Agregar datos de la solicitud
+        Object.keys(data).forEach(key => {
+          if (key !== 'attachments') {
+            formData.append(key, data[key]);
+          }
+        });
+        
+        // Agregar archivos adjuntos
+        attachments.forEach(file => {
+          formData.append('attachments', file);
+        });
+        
+        const response = await axios.post('/requests', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        });
+        
+        return response.data;
+      } else {
+        const response = await axios.post('/requests', data);
+        return response.data;
+      }
+    } catch (error) {
+      console.error('Error creating request:', error);
+      throw error;
+    }
+  },
+
+  updateStatus: async (id, status) => {
+    try {
+      const response = await axios.patch(`/requests/${id}`, { status });
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating request ${id} status:`, error);
+      throw error;
+    }
+  },
+
+  update: async (id, data) => {
+    try {
+      const response = await axios.put(`/requests/${id}`, data);
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating request ${id}:`, error);
+      throw error;
+    }
+  },
+
+  delete: async (id) => {
+    try {
+      const response = await axios.delete(`/requests/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error deleting request ${id}:`, error);
+      throw error;
+    }
+  }
+};
+
+// Servicio para órdenes de trabajo
+export const workOrderService = {
+  getAll: async () => {
+    try {
+      const response = await axios.get('/work-orders');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching work orders:', error);
+      throw error;
+    }
+  },
+
+  getById: async (id) => {
+    try {
+      const response = await axios.get(`/work-orders/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching work order ${id}:`, error);
+      throw error;
+    }
+  },
+
+  getRecent: async () => {
+    try {
+      const response = await axios.get('/work-orders/recent');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching recent work orders:', error);
+      throw error;
+    }
+  },
+
+  getRecentByTechnician: async (technicianId) => {
+    try {
+      const response = await axios.get(`/work-orders/technician/${technicianId}/recent`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching recent work orders for technician ${technicianId}:`, error);
+      throw error;
+    }
+  },
+
+  getByTechnician: async (technicianId) => {
+    try {
+      const response = await axios.get(`/work-orders/technician/${technicianId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching work orders for technician ${technicianId}:`, error);
+      throw error;
+    }
+  },
+
+  create: async (data) => {
+    try {
+      const response = await axios.post('/work-orders', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating work order:', error);
+      throw error;
+    }
+  },
+
+  updateStatus: async (id, status) => {
+    try {
+      const response = await axios.patch(`/work-orders/${id}/status`, { status });
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating work order ${id} status:`, error);
+      throw error;
+    }
+  },
+
+  update: async (id, data) => {
+    try {
+      const response = await axios.put(`/work-orders/${id}`, data);
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating work order ${id}:`, error);
+      throw error;
+    }
+  },
+
+  delete: async (id) => {
+    try {
+      const response = await axios.delete(`/work-orders/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error deleting work order ${id}:`, error);
+      throw error;
+    }
+  }
+};
+
+// Exportación por defecto como un objeto que contiene todos los servicios
+export default {
+  clientService,
+  servicePersonnelService,
+  requestService,
+  workOrderService
+};

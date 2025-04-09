@@ -1,10 +1,11 @@
-// client/src/components/Requests/RequestList.js
+// client/src/components/Requests/RequestList.js (corregido)
 import React from 'react';
 import { FaEye, FaTrash, FaCheck, FaTimes } from 'react-icons/fa';
 
-const RequestList = ({ requests, onView, onUpdate, onDelete, isAdmin }) => {
+const RequestList = ({ requests = [], onView, onUpdate, onDelete, isAdmin }) => {
   // Función para formatear la fecha
   const formatDate = (dateString) => {
+    if (!dateString) return '-';
     const options = { year: 'numeric', month: 'short', day: 'numeric' };
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
@@ -41,7 +42,8 @@ const RequestList = ({ requests, onView, onUpdate, onDelete, isAdmin }) => {
     }
   };
 
-  if (requests.length === 0) {
+  // Asegurar que requests sea un array y no sea undefined
+  if (!Array.isArray(requests) || requests.length === 0) {
     return (
       <div className="bg-white p-6 rounded-lg shadow-md text-center">
         <p className="text-gray-500">No hay solicitudes disponibles.</p>
@@ -91,26 +93,26 @@ const RequestList = ({ requests, onView, onUpdate, onDelete, isAdmin }) => {
                 </td>
                 {isAdmin && (
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {request.client.name}
+                    {request.client?.name || 'Cliente no disponible'}
                   </td>
                 )}
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {formatDate(request.created_at)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusConfig[request.status].color}`}>
-                    {statusConfig[request.status].label}
+                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusConfig[request.status]?.color || 'bg-gray-100 text-gray-800'}`}>
+                    {statusConfig[request.status]?.label || request.status || 'Desconocido'}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${priorityConfig[request.priority].color}`}>
-                    {priorityConfig[request.priority].label}
+                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${priorityConfig[request.priority]?.color || 'bg-gray-100 text-gray-800'}`}>
+                    {priorityConfig[request.priority]?.label || request.priority || 'Media'}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex justify-end space-x-2">
                     <button
-                      onClick={() => onView(request.id)}
+                      onClick={() => onView && onView(request.id)}
                       className="text-blue-600 hover:text-blue-900"
                       title="Ver detalles"
                     >
@@ -120,14 +122,14 @@ const RequestList = ({ requests, onView, onUpdate, onDelete, isAdmin }) => {
                     {isAdmin && request.status === 'pending' && (
                       <>
                         <button
-                          onClick={() => onUpdate(request.id, 'approved')}
+                          onClick={() => onUpdate && onUpdate(request.id, 'approved')}
                           className="text-green-600 hover:text-green-900"
                           title="Aprobar"
                         >
                           <FaCheck />
                         </button>
                         <button
-                          onClick={() => onUpdate(request.id, 'rejected')}
+                          onClick={() => onUpdate && onUpdate(request.id, 'rejected')}
                           className="text-red-600 hover:text-red-900"
                           title="Rechazar"
                         >
@@ -137,7 +139,7 @@ const RequestList = ({ requests, onView, onUpdate, onDelete, isAdmin }) => {
                     )}
                     
                     <button
-                      onClick={() => onDelete(request.id)}
+                      onClick={() => onDelete && onDelete(request.id)}
                       className="text-red-600 hover:text-red-900"
                       title="Eliminar"
                     >
